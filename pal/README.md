@@ -7,3 +7,4 @@
 # Known issues
 
  * Currently it's not really PAL as it's black and white only
+ * It's specific to PAL standard I, and so far only tested on UK TVs
