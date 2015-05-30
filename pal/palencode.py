@@ -7,10 +7,6 @@ from PIL import Image
 import struct
 import sys
 
-im = Image.open('BBC2_testcard_F_2.jpg')
-#im = Image.open('pm5544.png')
-pix = im.load()
-
 PIXEL_CLOCK = 13.5e6
 LINE_TIME = 64e-6
 SAMPLES_PER_LINE = PIXEL_CLOCK * LINE_TIME
@@ -52,12 +48,10 @@ def gen_pixel(r, g, b):
 	b /= 255.0
 	return 0.3 * r + 0.59 * g + 0.11 * b
 
-def gen_video(line_num):
-	#return [BLACK_LEVEL + ((WHITE_LEVEL - BLACK_LEVEL) * i / HORIZ_RES) for i in range(HORIZ_RES)]
-	#return ([BLACK_LEVEL] * 50 + [WHITE_LEVEL] * 50) * 7 + [BLACK_LEVEL] * 2
+def gen_video(im, line_num):
 	ret = []
 	for x in range(702):
-		pixel = pix[x / 702.0 * 760, line_num]
+		pixel = im[x / 702.0 * 760, line_num]
 		lum = gen_pixel(pixel[0], pixel[1], pixel[2])
 		ret += [BLACK_LEVEL + (WHITE_LEVEL - BLACK_LEVEL) * lum]
 	return ret
@@ -66,10 +60,10 @@ def gen_video(line_num):
 def gen_blank_line():
 	return gen_horiz_sync() + gen_back_porch() + [BLACK_LEVEL] * 702 + gen_front_porch()
 
-def gen_line(line_num):
-	return gen_horiz_sync() + gen_back_porch() + gen_video(line_num) + gen_front_porch()
+def gen_line(im, line_num):
+	return gen_horiz_sync() + gen_back_porch() + gen_video(im, line_num) + gen_front_porch()
 
-def gen_frame():
+def gen_frame(im):
 	frame = []
 
 	# Field 1
@@ -77,7 +71,7 @@ def gen_frame():
 	for i in range(17):
 		frame += gen_blank_line()
 	for i in range(0, 576, 2):
-		frame += gen_line(i)
+		frame += gen_line(im, i)
 	frame += gen_short_sync() * 5
 
 	# Field 2
@@ -85,18 +79,21 @@ def gen_frame():
 	for i in range(17):
 		frame += gen_blank_line()
 	for i in range(1, 576, 2):
-		frame += gen_line(i)
+		frame += gen_line(im, i)
 	frame += gen_horiz_sync() + gen_back_porch() + [BLACK_LEVEL] * (t2s(LINE_TIME/2 - HORIZ_SYNC_TIME - BACK_PORCH_TIME)) + gen_short_sync() * 5
 
 	return frame
 
 def main():
 	if len(sys.argv) < 2:
-		print "Usage: %s <output.bin>" % sys.argv[0]
+		print "Usage: %s <input_filename> [output_filename]" % sys.argv[0]
 		return
 
-	f = open(sys.argv[1], 'w')
-	frame = gen_frame()
+	input_filename = sys.argv[1]
+	output_filename = sys.argv[2] if len(sys.argv) > 2 else 'output.bin'
+
+	f = open(output_filename, 'w')
+	frame = gen_frame(Image.open(input_filename).load())
 	f.write(struct.pack('%sf' % len(frame), *frame))
 	f.close()
 
